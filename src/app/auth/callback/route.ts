@@ -1,24 +1,39 @@
-import { createServerSupabaseClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-/**
- * Auth Callback — обработка редиректа после OAuth
- */
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
 
   if (code) {
-    const supabase = createServerSupabaseClient()
+    const cookieStore = cookies()
+    
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name: string) {
+            return cookieStore.get(name)?.value
+          },
+          set(name: string, value: string, options: any) {
+            cookieStore.set({ name, value, ...options })
+          },
+          remove(name: string, options: any) {
+            cookieStore.set({ name, value: '', ...options })
+          },
+        },
+      }
+    )
+    
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (!error) {
-      // Проверяем есть ли пользователь в нашей таблице users
       const { data: { user } } = await supabase.auth.getUser()
       
       if (user) {
-        // Проверяем/создаём запись в users
+        // Проверяем есть ли пользователь
         const { data: existingUser } = await supabase
           .from('users')
           .select('id')
@@ -27,21 +42,21 @@ export async function GET(request: Request) {
         
         if (!existingUser) {
           // Создаём нового пользователя
-          await supabase.from('users').insert({
+          await supabase.from('users').insert([{
             id: user.id,
             email: user.email,
             language: 'ru',
             is_onboarded: false,
-          })
+          }])
           
           // Создаём начальную статистику
-          await supabase.from('rating_stats').insert({
+          await supabase.from('rating_stats').insert([{
             user_id: user.id,
             rating_power: 1.0,
             ratings_received_count: 0,
             ratings_given_count: 0,
             is_rating_visible: false,
-          })
+          }])
         }
         
         // Проверяем есть ли фото
@@ -52,7 +67,6 @@ export async function GET(request: Request) {
           .eq('is_active', true)
           .single()
         
-        // Редирект в зависимости от состояния
         if (!photo) {
           return NextResponse.redirect(`${origin}/upload`)
         }
@@ -62,6 +76,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // Ошибка — редирект на auth
   return NextResponse.redirect(`${origin}/auth?error=auth_failed`)
 }
