@@ -30,7 +30,6 @@ export default function RatePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       
-      // Получаем следующего из очереди
       const { data: queueItem } = await supabase
         .from('rating_queue')
         .select('id, photo_id, target_user_id')
@@ -42,22 +41,22 @@ export default function RatePage() {
         .limit(1)
         .single()
       
-      if (queueItem) {
-        // Получаем фото
+      if (queueItem && queueItem.photo_id && queueItem.target_user_id) {
+        const photoId = queueItem.photo_id
+        const targetUserId = queueItem.target_user_id
+        
         const { data: photo } = await supabase
           .from('photos')
           .select('url')
-          .eq('id', queueItem.photo_id)
+          .eq('id', photoId)
           .single()
         
-        // Получаем данные пользователя
         const { data: targetUser } = await supabase
           .from('users')
           .select('birth_year, country')
-          .eq('id', queueItem.target_user_id)
+          .eq('id', targetUserId)
           .single()
         
-        // Помечаем как показанное
         await supabase
           .from('rating_queue')
           .update({ is_shown: true })
@@ -65,19 +64,19 @@ export default function RatePage() {
         
         setTarget({
           queueId: queueItem.id,
-          photoId: queueItem.photo_id,
+          photoId: photoId,
           photoUrl: photo?.url || '',
-          targetUserId: queueItem.target_user_id,
+          targetUserId: targetUserId,
           ageRange: targetUser?.birth_year ? getAgeRange(targetUser.birth_year) : null,
           country: targetUser?.country || null,
         })
       } else {
-        // Пробуем сгенерировать очередь
         await generateQueue(user.id)
         setNoMoreTargets(true)
       }
     } catch (error) {
-      console.error('Error loading target:', error)
+      console.error('Error:', error)
+      setNoMoreTargets(true)
     } finally {
       setIsLoading(false)
     }
@@ -85,28 +84,17 @@ export default function RatePage() {
   
   const generateQueue = async (userId: string) => {
     try {
-      const { data: existingRatings } = await supabase
-        .from('ratings')
-        .select('rated_id')
-        .eq('rater_id', userId)
-      
-      const ratedIds = existingRatings?.map(r => r.rated_id) || []
-      ratedIds.push(userId)
-      
       const { data: candidates } = await supabase
         .from('photos')
         .select('id, user_id, url')
         .eq('is_active', true)
         .eq('status', 'approved')
+        .neq('user_id', userId)
         .limit(10)
       
       if (!candidates || candidates.length === 0) return
       
-      const filtered = candidates.filter(c => !ratedIds.includes(c.user_id))
-      
-      if (filtered.length === 0) return
-      
-      const queueItems = filtered.map((photo, index) => ({
+      const queueItems = candidates.map((photo, index) => ({
         target_user_id: photo.user_id,
         rater_user_id: userId,
         photo_id: photo.id,
@@ -129,20 +117,12 @@ export default function RatePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       
-      const { data: raterStats } = await supabase
-        .from('rating_stats')
-        .select('rating_power')
-        .eq('user_id', user.id)
-        .single()
-      
-      const raterPower = raterStats?.rating_power || 1.0
-      
       await supabase.from('ratings').insert([{
         rater_id: user.id,
         rated_id: target.targetUserId,
         photo_id: target.photoId,
         score,
-        rater_power: raterPower,
+        rater_power: 1.0,
         view_duration_ms: viewDurationMs,
         is_counted: true,
       }])
@@ -154,41 +134,30 @@ export default function RatePage() {
       
       setTarget(null)
       await loadNextTarget()
-      
     } catch (error) {
-      console.error('Error submitting rating:', error)
+      console.error('Error:', error)
       toast.error('Ошибка сохранения')
-      throw error
     }
   }, [target, supabase, loadNextTarget])
   
   const handleSkip = useCallback(async () => {
     if (!target) return
     
-    try {
-      await supabase
-        .from('rating_queue')
-        .update({ is_skipped: true })
-        .eq('id', target.queueId)
-      
-      setTarget(null)
-      await loadNextTarget()
-    } catch (error) {
-      console.error('Error skipping:', error)
-    }
+    await supabase
+      .from('rating_queue')
+      .update({ is_skipped: true })
+      .eq('id', target.queueId)
+    
+    setTarget(null)
+    await loadNextTarget()
   }, [target, supabase, loadNextTarget])
   
   useEffect(() => {
     loadNextTarget()
   }, [loadNextTarget])
   
-  if (isLoading && !target) {
-    return <RatingLoading />
-  }
-  
-  if (noMoreTargets) {
-    return <NoMoreTargets onRefresh={loadNextTarget} />
-  }
+  if (isLoading && !target) return <RatingLoading />
+  if (noMoreTargets) return <NoMoreTargets onRefresh={loadNextTarget} />
   
   return (
     <AnimatePresence mode="wait">
