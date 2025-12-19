@@ -22,7 +22,6 @@ export default function RatePage() {
   
   const supabase = createClient()
   
-  // Загрузка следующего для оценки
   const loadNextTarget = useCallback(async () => {
     setIsLoading(true)
     setNoMoreTargets(false)
@@ -31,19 +30,10 @@ export default function RatePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       
-      // Вызываем RPC функцию или делаем запрос напрямую
-      // MVP: простой запрос к очереди
-      
-      // Сначала проверяем есть ли в очереди
+      // Получаем следующего из очереди
       const { data: queueItem } = await supabase
         .from('rating_queue')
-        .select(`
-          id,
-          photo_id,
-          target_user_id,
-          photos!inner(url),
-          users!rating_queue_target_user_id_fkey(birth_year, country)
-        `)
+        .select('id, photo_id, target_user_id')
         .eq('rater_user_id', user.id)
         .eq('is_shown', false)
         .eq('is_rated', false)
@@ -53,106 +43,70 @@ export default function RatePage() {
         .single()
       
       if (queueItem) {
+        // Получаем фото
+        const { data: photo } = await supabase
+          .from('photos')
+          .select('url')
+          .eq('id', queueItem.photo_id)
+          .single()
+        
+        // Получаем данные пользователя
+        const { data: targetUser } = await supabase
+          .from('users')
+          .select('birth_year, country')
+          .eq('id', queueItem.target_user_id)
+          .single()
+        
         // Помечаем как показанное
         await supabase
           .from('rating_queue')
           .update({ is_shown: true })
           .eq('id', queueItem.id)
         
-        const photo = queueItem.photos as any
-        const targetUser = queueItem.users as any
-        
         setTarget({
           queueId: queueItem.id,
           photoId: queueItem.photo_id,
           photoUrl: photo?.url || '',
           targetUserId: queueItem.target_user_id,
-          ageRange: targetUser?.birth_year 
-            ? getAgeRange(targetUser.birth_year) 
-            : null,
+          ageRange: targetUser?.birth_year ? getAgeRange(targetUser.birth_year) : null,
           country: targetUser?.country || null,
         })
       } else {
-        // Пытаемся сгенерировать очередь
+        // Пробуем сгенерировать очередь
         await generateQueue(user.id)
-        
-        // Повторно проверяем
-        const { data: newQueueItem } = await supabase
-          .from('rating_queue')
-          .select(`
-            id,
-            photo_id,
-            target_user_id,
-            photos!inner(url),
-            users!rating_queue_target_user_id_fkey(birth_year, country)
-          `)
-          .eq('rater_user_id', user.id)
-          .eq('is_shown', false)
-          .eq('is_rated', false)
-          .order('priority', { ascending: false })
-          .limit(1)
-          .single()
-        
-        if (newQueueItem) {
-          await supabase
-            .from('rating_queue')
-            .update({ is_shown: true })
-            .eq('id', newQueueItem.id)
-          
-          const photo = newQueueItem.photos as any
-          const targetUser = newQueueItem.users as any
-          
-          setTarget({
-            queueId: newQueueItem.id,
-            photoId: newQueueItem.photo_id,
-            photoUrl: photo?.url || '',
-            targetUserId: newQueueItem.target_user_id,
-            ageRange: targetUser?.birth_year 
-              ? getAgeRange(targetUser.birth_year) 
-              : null,
-            country: targetUser?.country || null,
-          })
-        } else {
-          setNoMoreTargets(true)
-        }
+        setNoMoreTargets(true)
       }
     } catch (error) {
       console.error('Error loading target:', error)
-      toast.error('Ошибка загрузки')
     } finally {
       setIsLoading(false)
     }
   }, [supabase])
   
-  // Генерация очереди
   const generateQueue = async (userId: string) => {
     try {
-      // Получаем ID уже оценённых
       const { data: existingRatings } = await supabase
         .from('ratings')
         .select('rated_id')
         .eq('rater_id', userId)
       
       const ratedIds = existingRatings?.map(r => r.rated_id) || []
-      ratedIds.push(userId) // Исключаем себя
+      ratedIds.push(userId)
       
-      // Получаем пользователей с активными фото
       const { data: candidates } = await supabase
         .from('photos')
-        .select(`
-          id,
-          user_id,
-          url
-        `)
+        .select('id, user_id, url')
         .eq('is_active', true)
         .eq('status', 'approved')
-        .not('user_id', 'in', `(${ratedIds.join(',')})`)
         .limit(10)
       
       if (!candidates || candidates.length === 0) return
       
-      // Создаём записи в очереди
-      const queueItems = candidates.map((photo, index) => ({
+      const filtered = candidates.filter(c => !ratedIds.includes(c.user_id))
+      
+      if (filtered.length === 0) return
+      
+      const queueItems = filtered.map((photo, index) => ({
         target_user_id: photo.user_id,
         rater_user_id: userId,
         photo_id: photo.id,
@@ -168,7 +122,6 @@ export default function RatePage() {
     }
   }
   
-  // Отправка оценки
   const handleSubmit = useCallback(async (score: number, viewDurationMs: number) => {
     if (!target) return
     
@@ -176,7 +129,6 @@ export default function RatePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
       
-      // Получаем rating_power оценщика
       const { data: raterStats } = await supabase
         .from('rating_stats')
         .select('rating_power')
@@ -185,8 +137,7 @@ export default function RatePage() {
       
       const raterPower = raterStats?.rating_power || 1.0
       
-      // Создаём оценку
-      await supabase.from('ratings').insert({
+      await supabase.from('ratings').insert([{
         rater_id: user.id,
         rated_id: target.targetUserId,
         photo_id: target.photoId,
@@ -194,18 +145,13 @@ export default function RatePage() {
         rater_power: raterPower,
         view_duration_ms: viewDurationMs,
         is_counted: true,
-      })
+      }])
       
-      // Обновляем очередь
       await supabase
         .from('rating_queue')
         .update({ is_rated: true })
         .eq('id', target.queueId)
       
-      // Обновляем счётчик оценщика
-      await supabase.rpc('increment_ratings_given', { user_id: user.id })
-      
-      // Загружаем следующего
       setTarget(null)
       await loadNextTarget()
       
@@ -216,7 +162,6 @@ export default function RatePage() {
     }
   }, [target, supabase, loadNextTarget])
   
-  // Пропуск
   const handleSkip = useCallback(async () => {
     if (!target) return
     
@@ -233,12 +178,10 @@ export default function RatePage() {
     }
   }, [target, supabase, loadNextTarget])
   
-  // Загрузка при монтировании
   useEffect(() => {
     loadNextTarget()
   }, [loadNextTarget])
   
-  // Рендер
   if (isLoading && !target) {
     return <RatingLoading />
   }
@@ -263,9 +206,7 @@ export default function RatePage() {
 }
 
 function getAgeRange(birthYear: number): string {
-  const currentYear = new Date().getFullYear()
-  const age = currentYear - birthYear
-  
+  const age = new Date().getFullYear() - birthYear
   if (age < 20) return '18-19'
   if (age < 25) return '20-24'
   if (age < 30) return '25-29'
