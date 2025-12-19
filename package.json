@@ -19,7 +19,8 @@
     "zustand": "^4.5.0",
     "sonner": "^1.4.0",
     "clsx": "^2.1.0",
-    "tailwind-merge": "^2.2.1"
+    "tailwind-merge": "^2.2.1",
+    "geist": "^1.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.16",
