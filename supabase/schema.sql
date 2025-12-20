@@ -169,17 +169,56 @@ create policy "Users can view own history" on public.rating_history
 -- ============================================
 
 -- Функция инкремента поставленных оценок
-create or replace function public.increment_ratings_given(user_id uuid)
+create or replace function public.increment_ratings_given(p_user_id uuid)
 returns void
 language plpgsql
 security definer
 as $$
 begin
   update public.rating_stats
-  set 
+  set
     ratings_given_count = ratings_given_count + 1,
     updated_at = now()
-  where rating_stats.user_id = increment_ratings_given.user_id;
+  where rating_stats.user_id = p_user_id;
+end;
+$$;
+
+-- Функция обновления веса голоса (rating_power)
+-- Вес растет с количеством калибровок:
+-- 0-9 калибровок = 1.0x
+-- 10-49 = 1.1x
+-- 50-99 = 1.2x
+-- 100-199 = 1.3x
+-- 200-499 = 1.5x
+-- 500+ = 2.0x
+create or replace function public.update_rater_power(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_given_count int;
+  v_new_power decimal;
+begin
+  -- Получаем текущее количество калибровок
+  select ratings_given_count into v_given_count
+  from public.rating_stats
+  where user_id = p_user_id;
+
+  -- Рассчитываем новый вес голоса
+  v_new_power := case
+    when v_given_count >= 500 then 2.0
+    when v_given_count >= 200 then 1.5
+    when v_given_count >= 100 then 1.3
+    when v_given_count >= 50 then 1.2
+    when v_given_count >= 10 then 1.1
+    else 1.0
+  end;
+
+  -- Обновляем
+  update public.rating_stats
+  set rating_power = v_new_power
+  where user_id = p_user_id;
 end;
 $$;
 
@@ -229,10 +268,20 @@ language plpgsql
 security definer
 as $$
 begin
+  -- Обновляем статистику получателя оценки
   perform public.recalculate_user_rating(NEW.rated_id);
+
+  -- Обновляем счетчик данных оценок для оценщика
+  perform public.increment_ratings_given(NEW.rater_id);
+
+  -- Обновляем rating_power оценщика (растет с количеством калибровок)
+  perform public.update_rater_power(NEW.rater_id);
+
   return NEW;
 end;
 $$;
+
+drop trigger if exists on_rating_insert on public.ratings;
 
 create trigger on_rating_insert
   after insert on public.ratings

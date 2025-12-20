@@ -40,6 +40,7 @@ export function SwipeCard({
   disabled = false,
 }: SwipeCardProps) {
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
   const [exitDirection, setExitDirection] = useState<'left' | 'right' | null>(null)
 
   // Motion values для drag
@@ -137,23 +138,38 @@ export function SwipeCard({
             className="absolute inset-0"
             style={{ x: bgX, scale: bgScale }}
           >
-            <Image
-              src={photoUrl}
-              alt="Rate this person"
-              fill
-              className={cn(
-                'object-cover transition-opacity duration-700',
-                imageLoaded ? 'opacity-100' : 'opacity-0'
-              )}
-              priority
-              onLoad={() => setImageLoaded(true)}
-              sizes="100vw"
-            />
+            {!imageError ? (
+              <Image
+                src={photoUrl}
+                alt="Rate this person"
+                fill
+                className={cn(
+                  'object-cover transition-opacity duration-700',
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                )}
+                priority
+                onLoad={() => setImageLoaded(true)}
+                onError={() => {
+                  setImageError(true)
+                  setImageLoaded(true)
+                }}
+                sizes="100vw"
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-violet-900/50 to-purple-900/50 flex items-center justify-center">
+                <div className="text-center">
+                  <svg className="w-16 h-16 text-white/30 mx-auto mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                  </svg>
+                  <p className="text-white/40 text-sm">Не удалось загрузить</p>
+                </div>
+              </div>
+            )}
           </motion.div>
 
           {/* Skeleton loader */}
           <AnimatePresence>
-            {!imageLoaded && (
+            {!imageLoaded && !imageError && (
               <motion.div
                 className="absolute inset-0 bg-surface"
                 exit={{ opacity: 0 }}
@@ -333,7 +349,7 @@ export function ActionButtons({
           <div className="w-6 h-6 border-3 border-black/20 border-t-black rounded-full animate-spin" />
         ) : (
           <>
-            <span className="relative z-10">Оценить</span>
+            <span className="relative z-10">Отправить</span>
             <motion.svg
               className="w-5 h-5 relative z-10"
               viewBox="0 0 24 24"
