@@ -280,15 +280,15 @@
   .gradient-rating-low {
     @apply bg-gradient-to-r from-red-500 to-orange-500;
   }
-  
+
   .gradient-rating-medium {
     @apply bg-gradient-to-r from-orange-500 to-yellow-500;
   }
-  
+
   .gradient-rating-high {
     @apply bg-gradient-to-r from-green-500 to-emerald-500;
   }
-  
+
   .gradient-rating-elite {
     @apply bg-gradient-to-r from-violet-500 to-purple-500;
   }
@@ -297,7 +297,7 @@
   .animate-stagger > * {
     @apply opacity-0 animate-fade-up;
   }
-  
+
   .animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
   .animate-stagger > *:nth-child(2) { animation-delay: 50ms; }
   .animate-stagger > *:nth-child(3) { animation-delay: 100ms; }
@@ -313,8 +313,141 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
-  
+
   .safe-top {
     padding-top: env(safe-area-inset-top);
   }
+
+  /* ============================================
+     PREMIUM MOTION UTILITIES
+     ============================================ */
+
+  /* Glassmorphism variants */
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+  }
+
+  .glass-strong {
+    @apply bg-black/40 backdrop-blur-2xl border border-white/10;
+  }
+
+  /* Glow effects */
+  .glow-white {
+    box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
+  }
+
+  .glow-violet {
+    box-shadow: 0 0 60px rgba(139, 92, 246, 0.3);
+  }
+
+  .glow-pulse {
+    animation: glowPulse 3s ease-in-out infinite;
+  }
+
+  /* Shimmer effect for loading states */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.05),
+      transparent
+    );
+    animation: shimmer 2s infinite linear;
+  }
+
+  /* Text effects */
+  .text-shadow-glow {
+    text-shadow: 0 0 40px currentColor, 0 0 80px currentColor;
+  }
+
+  /* Interactive states */
+  .hover-lift {
+    @apply transition-transform duration-300 ease-out-expo;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1;
+  }
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ============================================
+   ADDITIONAL KEYFRAMES
+   ============================================ */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes glowPulse {
+  0%, 100% {
+    opacity: 0.5;
+    box-shadow: 0 0 40px rgba(139, 92, 246, 0.2);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 80px rgba(139, 92, 246, 0.4);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Premium scrollbar for webkit */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
