@@ -271,18 +271,18 @@ export function RatingSlider({
 
       {/* Scale Labels */}
       <div className="flex justify-between mt-3 px-0.5">
-        {[1, 5.5, 10].map((num) => (
+        {[1, 3, 5, 7, 9, 10].map((num) => (
           <motion.span
             key={num}
             className={cn(
-              'text-sm font-mono transition-colors duration-200',
+              'text-xs font-mono transition-colors duration-200',
               Math.abs(localValue - num) < 0.5 ? 'text-white' : 'text-white/30'
             )}
             animate={{
               scale: Math.abs(localValue - num) < 0.5 ? 1.1 : 1,
             }}
           >
-            {num === 5.5 ? '5.5' : num}
+            {num}
           </motion.span>
         ))}
       </div>
