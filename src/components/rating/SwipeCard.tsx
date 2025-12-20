@@ -16,6 +16,7 @@ interface SwipeCardProps {
   photoId: string
   onSwipeLeft: () => void
   onSwipeRight: () => void
+  onImageError?: () => void
   children?: React.ReactNode
   disabled?: boolean
 }
@@ -36,6 +37,7 @@ export function SwipeCard({
   photoId,
   onSwipeLeft,
   onSwipeRight,
+  onImageError,
   children,
   disabled = false,
 }: SwipeCardProps) {
@@ -152,6 +154,10 @@ export function SwipeCard({
                 onError={() => {
                   setImageError(true)
                   setImageLoaded(true)
+                  // Auto-skip to next photo after delay
+                  if (onImageError) {
+                    setTimeout(onImageError, 1500)
+                  }
                 }}
                 sizes="100vw"
               />

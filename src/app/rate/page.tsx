@@ -311,6 +311,7 @@ export default function CalibrationPage() {
                 photoId={target.photoId}
                 onSwipeLeft={handleSkip}
                 onSwipeRight={handleSubmit}
+                onImageError={handleSkip}
                 disabled={isSubmitting}
               >
                 {/* Particles */}
