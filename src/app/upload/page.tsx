@@ -204,7 +204,6 @@ export default function UploadPage() {
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="user"
           onChange={handleFileSelect}
           className="hidden"
         />
