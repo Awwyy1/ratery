@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
-import { cn, getRatingGradient } from '@/lib/utils'
+import { cn, getPerceptionGradient } from '@/lib/utils'
 
 interface ShareButtonProps {
   rating: number | null
@@ -25,8 +25,8 @@ export function ShareButton({ rating, percentile }: ShareButtonProps) {
 
   const handleShare = async () => {
     const text = rating
-      ? `Мой рейтинг на Ratery: ${rating.toFixed(2)} (Top ${percentile?.toFixed(0) || '?'}%) 🔥\n\nУзнай свой: https://ratery-delta.vercel.app`
-      : `Узнай свой рейтинг на Ratery! 🔥\n\nhttps://ratery-delta.vercel.app`
+      ? `Мой индекс восприятия на Ratery: ${rating.toFixed(2)} (Top ${percentile?.toFixed(0) || '?'}%)\n\nУзнай свой: https://ratery-delta.vercel.app`
+      : `Узнай свой индекс восприятия на Ratery!\n\nhttps://ratery-delta.vercel.app`
 
     // Vibrate
     if (navigator.vibrate) navigator.vibrate(10)
@@ -34,7 +34,7 @@ export function ShareButton({ rating, percentile }: ShareButtonProps) {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'Ratery — Узнай свой рейтинг',
+          title: 'Ratery — Индекс восприятия',
           text: text,
           url: 'https://ratery-delta.vercel.app',
         })
@@ -51,7 +51,7 @@ export function ShareButton({ rating, percentile }: ShareButtonProps) {
     }
   }
 
-  const gradient = rating ? getRatingGradient(rating) : 'from-violet-500 to-purple-500'
+  const gradient = rating ? getPerceptionGradient(rating) : 'from-violet-500 to-purple-500'
 
   return (
     <motion.button
@@ -168,8 +168,8 @@ export function ShareIconButton({
 }: ShareButtonProps & { className?: string }) {
   const handleShare = async () => {
     const text = rating
-      ? `Мой рейтинг на Ratery: ${rating.toFixed(2)} (Top ${percentile?.toFixed(0) || '?'}%) 🔥`
-      : `Узнай свой рейтинг на Ratery! 🔥`
+      ? `Мой индекс восприятия на Ratery: ${rating.toFixed(2)} (Top ${percentile?.toFixed(0) || '?'}%)`
+      : `Узнай свой индекс восприятия на Ratery!`
 
     if (navigator.share) {
       try {

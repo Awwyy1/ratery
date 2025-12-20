@@ -2,25 +2,24 @@
 // @ts-nocheck
 
 import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence, useMotionValue, useTransform, animate } from 'framer-motion'
+import { motion, AnimatePresence, animate } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { BottomNav } from '@/components/ui/BottomNav'
 import { ShareButton } from '@/components/ui/ShareButton'
 import { RatingDisplay } from '@/components/rating/RatingSlider'
 import { toast } from 'sonner'
-import { cn, getRatingGradient, getPercentileEmoji } from '@/lib/utils'
+import { cn, getPerceptionGradient, getConfidenceLevel, formatPercentile } from '@/lib/utils'
 
 /**
- * Profile Page — Premium Awwwards-level Design
+ * Profile Page — Perception Index Display
  *
  * Features:
  * - Animated progress ring around photo
- * - Confetti explosion on rating reveal
+ * - Confidence level indicator
+ * - Reactions count display
  * - 3D flip stats cards
- * - Parallax header
- * - Glowing rating display
- * - Staggered animations
+ * - Glowing perception index display
  */
 export default function ProfilePage() {
   const router = useRouter()
@@ -58,7 +57,7 @@ export default function ProfilePage() {
         setPhoto(photoResult.data)
         setStats(statsResult.data)
 
-        // Trigger confetti on first rating reveal
+        // Trigger confetti on first index reveal
         if (statsResult.data?.is_rating_visible && !hasShownConfetti.current) {
           setTimeout(() => {
             setShowConfetti(true)
@@ -96,12 +95,13 @@ export default function ProfilePage() {
     )
   }
 
-  const rating = stats?.current_rating
+  const perceptionIndex = stats?.current_rating
   const percentile = stats?.percentile
   const isVisible = stats?.is_rating_visible
-  const ratingsCount = stats?.ratings_received_count || 0
-  const minRatings = 20
-  const progress = Math.min(100, (ratingsCount / minRatings) * 100)
+  const reactionsCount = stats?.ratings_received_count || 0
+  const minReactions = 15
+  const progress = Math.min(100, (reactionsCount / minReactions) * 100)
+  const confidence = getConfidenceLevel(reactionsCount)
 
   return (
     <div className="min-h-screen bg-background pb-24 overflow-hidden">
@@ -115,8 +115,8 @@ export default function ProfilePage() {
         <motion.div
           className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[800px] rounded-full"
           style={{
-            background: rating
-              ? `radial-gradient(circle, ${getRatingColorHex(rating)}20 0%, transparent 70%)`
+            background: perceptionIndex
+              ? `radial-gradient(circle, ${getPerceptionColorHex(perceptionIndex)}20 0%, transparent 70%)`
               : 'radial-gradient(circle, rgba(139, 92, 246, 0.1) 0%, transparent 70%)',
           }}
           animate={{
@@ -157,25 +157,25 @@ export default function ProfilePage() {
           <ProfilePhotoRing
             photo={photo}
             progress={isVisible ? 100 : progress}
-            rating={rating}
+            perceptionIndex={perceptionIndex}
             isVisible={isVisible}
           />
         </motion.div>
 
-        {/* Rating Display */}
+        {/* Perception Index Display */}
         <AnimatePresence mode="wait">
-          {isVisible && rating ? (
+          {isVisible && perceptionIndex ? (
             <motion.div
-              key="rating"
+              key="index"
               className="text-center"
               initial={{ opacity: 0, y: 30, scale: 0.9 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -30 }}
               transition={{ type: 'spring', stiffness: 300, damping: 25 }}
             >
-              {/* Rating Number */}
+              {/* Index Number */}
               <div className="relative inline-block">
-                <RatingDisplay value={rating} size="mega" animated showGlow />
+                <RatingDisplay value={perceptionIndex} size="mega" animated showGlow />
 
                 {/* Percentile Badge */}
                 {percentile && (
@@ -188,24 +188,35 @@ export default function ProfilePage() {
                     <div className={cn(
                       'px-3 py-1.5 rounded-full',
                       'bg-gradient-to-r',
-                      getRatingGradient(rating),
+                      getPerceptionGradient(perceptionIndex),
                       'text-white text-sm font-bold',
                       'shadow-lg'
                     )}>
-                      {getPercentileEmoji(100 - percentile)} Top {percentile.toFixed(0)}%
+                      {formatPercentile(percentile)}
                     </div>
                   </motion.div>
                 )}
               </div>
 
-              {/* Subtitle */}
-              <motion.p
-                className="text-white/40 text-sm mt-4"
+              {/* Confidence Level */}
+              <motion.div
+                className="mt-4 flex items-center justify-center gap-2"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.5 }}
               >
-                Твоя объективная оценка
+                <ConfidenceIndicator level={confidence.level} />
+                <span className="text-white/60 text-sm">{confidence.label}</span>
+              </motion.div>
+
+              {/* Subtitle */}
+              <motion.p
+                className="text-white/40 text-sm mt-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                Индекс восприятия
               </motion.p>
             </motion.div>
           ) : (
@@ -215,9 +226,9 @@ export default function ProfilePage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <PendingRatingCard
-                current={ratingsCount}
-                required={minRatings}
+              <PendingIndexCard
+                current={reactionsCount}
+                required={minReactions}
                 progress={progress}
               />
             </motion.div>
@@ -232,33 +243,33 @@ export default function ProfilePage() {
           transition={{ delay: 0.3 }}
         >
           <StatCard
-            value={ratingsCount}
-            label="Получено"
-            icon="📥"
+            value={reactionsCount}
+            label="Реакций"
+            icon={<ReactionIcon />}
             delay={0}
           />
           <StatCard
             value={stats?.ratings_given_count || 0}
-            label="Поставлено"
-            icon="📤"
+            label="Откалибровано"
+            icon={<CalibrationIcon />}
             delay={0.1}
           />
           <StatCard
-            value={`${stats?.rating_power?.toFixed(1) || '1.0'}×`}
+            value={`${stats?.rating_power?.toFixed(1) || '1.0'}x`}
             label="Вес голоса"
-            icon="⚡"
+            icon={<WeightIcon />}
             delay={0.2}
           />
         </motion.div>
 
         {/* Share Button */}
-        {isVisible && rating && (
+        {isVisible && perceptionIndex && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <ShareButton rating={rating} percentile={percentile} />
+            <ShareButton rating={perceptionIndex} percentile={percentile} />
           </motion.div>
         )}
 
@@ -288,17 +299,89 @@ export default function ProfilePage() {
 }
 
 /**
+ * Confidence Level Indicator
+ */
+function ConfidenceIndicator({ level }: { level: 'early' | 'emerging' | 'stable' }) {
+  const colors = {
+    early: 'bg-orange-500',
+    emerging: 'bg-yellow-500',
+    stable: 'bg-green-500',
+  }
+
+  const bars = {
+    early: 1,
+    emerging: 2,
+    stable: 3,
+  }
+
+  return (
+    <div className="flex items-end gap-0.5 h-4">
+      {[1, 2, 3].map((bar) => (
+        <motion.div
+          key={bar}
+          className={cn(
+            'w-1.5 rounded-full transition-colors',
+            bar <= bars[level] ? colors[level] : 'bg-white/20'
+          )}
+          style={{ height: `${bar * 33}%` }}
+          initial={{ scaleY: 0 }}
+          animate={{ scaleY: 1 }}
+          transition={{ delay: bar * 0.1 }}
+        />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * SVG Icons
+ */
+function ReactionIcon() {
+  return (
+    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    </svg>
+  )
+}
+
+function CalibrationIcon() {
+  return (
+    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+    </svg>
+  )
+}
+
+function WeightIcon() {
+  return (
+    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+    </svg>
+  )
+}
+
+function HourglassIcon() {
+  return (
+    <svg className="w-12 h-12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6l4 2" />
+      <circle cx="12" cy="12" r="10" />
+    </svg>
+  )
+}
+
+/**
  * Animated Profile Photo with Progress Ring
  */
 function ProfilePhotoRing({
   photo,
   progress,
-  rating,
+  perceptionIndex,
   isVisible
 }: {
   photo: any
   progress: number
-  rating?: number
+  perceptionIndex?: number
   isVisible?: boolean
 }) {
   const circumference = 2 * Math.PI * 68 // radius = 68
@@ -306,11 +389,11 @@ function ProfilePhotoRing({
   return (
     <div className="relative w-40 h-40">
       {/* Outer glow */}
-      {isVisible && rating && (
+      {isVisible && perceptionIndex && (
         <motion.div
           className="absolute inset-0 rounded-full blur-xl"
           style={{
-            background: `radial-gradient(circle, ${getRatingColorHex(rating)}40 0%, transparent 70%)`,
+            background: `radial-gradient(circle, ${getPerceptionColorHex(perceptionIndex)}40 0%, transparent 70%)`,
           }}
           animate={{
             scale: [1, 1.2, 1],
@@ -337,7 +420,7 @@ function ProfilePhotoRing({
           cy="80"
           r="68"
           fill="none"
-          stroke={isVisible && rating ? getRatingColorHex(rating) : '#8B5CF6'}
+          stroke={isVisible && perceptionIndex ? getPerceptionColorHex(perceptionIndex) : '#8B5CF6'}
           strokeWidth="4"
           strokeLinecap="round"
           strokeDasharray={circumference}
@@ -375,9 +458,9 @@ function ProfilePhotoRing({
 }
 
 /**
- * Pending Rating Card
+ * Pending Index Card
  */
-function PendingRatingCard({
+function PendingIndexCard({
   current,
   required,
   progress
@@ -397,15 +480,15 @@ function PendingRatingCard({
       animate={{ opacity: 1, scale: 1 }}
     >
       <motion.div
-        className="text-5xl mb-4"
+        className="flex justify-center mb-4 text-white/40"
         animate={{ rotate: [0, 10, -10, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        ⏳
+        <HourglassIcon />
       </motion.div>
 
       <h3 className="text-xl font-semibold text-white mb-2">
-        Недостаточно оценок
+        Недостаточно реакций
       </h3>
 
       <p className="text-white/50 mb-6">
@@ -429,7 +512,7 @@ function PendingRatingCard({
       </div>
 
       <p className="text-white/30 text-sm">
-        Оценивай других, чтобы получать оценки быстрее
+        Калибруй других, чтобы получать реакции быстрее
       </p>
     </motion.div>
   )
@@ -446,7 +529,7 @@ function StatCard({
 }: {
   value: number | string
   label: string
-  icon: string
+  icon: React.ReactNode
   delay?: number
 }) {
   const [displayValue, setDisplayValue] = useState(0)
@@ -483,7 +566,7 @@ function StatCard({
 
       <div className="relative z-10 text-center">
         <motion.div
-          className="text-2xl mb-2"
+          className="text-white/60 mb-2 flex justify-center"
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 2, repeat: Infinity, delay }}
         >
@@ -545,12 +628,12 @@ function Confetti() {
 }
 
 /**
- * Get rating color as hex
+ * Get perception index color as hex
  */
-function getRatingColorHex(rating: number): string {
-  if (rating < 3) return '#EF4444'
-  if (rating < 5) return '#F59E0B'
-  if (rating < 7) return '#84CC16'
-  if (rating < 9) return '#22C55E'
+function getPerceptionColorHex(value: number): string {
+  if (value < 3) return '#EF4444'
+  if (value < 5) return '#F59E0B'
+  if (value < 7) return '#84CC16'
+  if (value < 9) return '#22C55E'
   return '#8B5CF6'
 }
