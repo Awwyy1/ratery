@@ -9,45 +9,73 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Форматирование рейтинга с двумя знаками после запятой
+ * Форматирование индекса восприятия с двумя знаками после запятой
  */
-export function formatRating(rating: number | null | undefined): string {
-  if (rating === null || rating === undefined) return '—'
-  return rating.toFixed(2)
+export function formatPerceptionIndex(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—'
+  return value.toFixed(2)
 }
 
 /**
- * Получение цвета для рейтинга
+ * Получение цвета для индекса восприятия
  */
-export function getRatingColor(rating: number): string {
-  if (rating < 3) return 'text-red-500'
-  if (rating < 5) return 'text-orange-500'
-  if (rating < 7) return 'text-yellow-500'
-  if (rating < 9) return 'text-green-500'
+export function getPerceptionColor(value: number): string {
+  if (value < 3) return 'text-red-500'
+  if (value < 5) return 'text-orange-500'
+  if (value < 7) return 'text-yellow-500'
+  if (value < 9) return 'text-green-500'
   return 'text-violet-500'
 }
 
 /**
- * Получение градиента для рейтинга
+ * Получение градиента для индекса восприятия
  */
-export function getRatingGradient(rating: number): string {
-  if (rating < 3) return 'from-red-500 to-orange-500'
-  if (rating < 5) return 'from-orange-500 to-yellow-500'
-  if (rating < 7) return 'from-yellow-500 to-lime-500'
-  if (rating < 9) return 'from-green-500 to-emerald-500'
+export function getPerceptionGradient(value: number): string {
+  if (value < 3) return 'from-red-500 to-orange-500'
+  if (value < 5) return 'from-orange-500 to-yellow-500'
+  if (value < 7) return 'from-yellow-500 to-lime-500'
+  if (value < 9) return 'from-green-500 to-emerald-500'
   return 'from-violet-500 to-purple-500'
 }
 
+// Alias for backwards compatibility
+export const getRatingGradient = getPerceptionGradient
+
 /**
- * Получение эмодзи для процентиля
+ * Уровни уверенности индекса
  */
-export function getPercentileEmoji(percentile: number): string {
-  if (percentile >= 99) return '👑'
-  if (percentile >= 95) return '🔥'
-  if (percentile >= 90) return '⭐'
-  if (percentile >= 80) return '✨'
-  if (percentile >= 70) return '💫'
-  return ''
+export type ConfidenceLevel = 'early' | 'emerging' | 'stable'
+
+export interface ConfidenceInfo {
+  level: ConfidenceLevel
+  label: string
+  description: string
+  minReactions: number
+}
+
+export function getConfidenceLevel(reactionsCount: number): ConfidenceInfo {
+  if (reactionsCount < 15) {
+    return {
+      level: 'early',
+      label: 'Ранний сигнал',
+      description: 'Недостаточно реакций для стабильного индекса',
+      minReactions: 15,
+    }
+  }
+  if (reactionsCount < 70) {
+    return {
+      level: 'emerging',
+      label: 'Формируется',
+      description: 'Индекс становится стабильнее',
+      minReactions: 70,
+    }
+  }
+  return {
+    level: 'stable',
+    label: 'Стабильный',
+    description: 'Высокая уверенность в индексе',
+    minReactions: 150,
+  }
 }
 
 /**
@@ -56,14 +84,14 @@ export function getPercentileEmoji(percentile: number): string {
 export function formatPercentile(percentile: number | null): string {
   if (percentile === null) return ''
   const topPercent = Math.round(100 - percentile)
-  if (topPercent <= 1) return 'Топ 1%'
-  return `Топ ${topPercent}%`
+  if (topPercent <= 1) return 'Top 1%'
+  return `Top ${topPercent}%`
 }
 
 /**
- * Форматирование изменения рейтинга
+ * Форматирование изменения индекса
  */
-export function formatRatingChange(change: number | null): {
+export function formatIndexChange(change: number | null): {
   text: string
   isPositive: boolean
   isNeutral: boolean
@@ -71,10 +99,10 @@ export function formatRatingChange(change: number | null): {
   if (change === null || change === 0) {
     return { text: '—', isPositive: false, isNeutral: true }
   }
-  
+
   const isPositive = change > 0
   const text = `${isPositive ? '+' : ''}${change.toFixed(2)}`
-  
+
   return { text, isPositive, isNeutral: false }
 }
 
@@ -83,10 +111,10 @@ export function formatRatingChange(change: number | null): {
  */
 export function getAgeRange(birthYear: number | null): string | null {
   if (!birthYear) return null
-  
+
   const currentYear = new Date().getFullYear()
   const age = currentYear - birthYear
-  
+
   if (age < 20) return '18-19'
   if (age < 25) return '20-24'
   if (age < 30) return '25-29'
@@ -97,20 +125,6 @@ export function getAgeRange(birthYear: number | null): string | null {
 }
 
 /**
- * Конвертация кода страны в флаг эмодзи
- */
-export function countryCodeToFlag(countryCode: string | null): string {
-  if (!countryCode) return ''
-  
-  const codePoints = countryCode
-    .toUpperCase()
-    .split('')
-    .map(char => 127397 + char.charCodeAt(0))
-  
-  return String.fromCodePoint(...codePoints)
-}
-
-/**
  * Debounce функция
  */
 export function debounce<T extends (...args: any[]) => any>(
@@ -118,7 +132,7 @@ export function debounce<T extends (...args: any[]) => any>(
   delay: number
 ): (...args: Parameters<T>) => void {
   let timeoutId: NodeJS.Timeout
-  
+
   return (...args: Parameters<T>) => {
     clearTimeout(timeoutId)
     timeoutId = setTimeout(() => fn(...args), delay)
@@ -133,7 +147,7 @@ export function throttle<T extends (...args: any[]) => any>(
   limit: number
 ): (...args: Parameters<T>) => void {
   let inThrottle = false
-  
+
   return (...args: Parameters<T>) => {
     if (!inThrottle) {
       fn(...args)
