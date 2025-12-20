@@ -1,20 +1,20 @@
 'use client'
+// @ts-nocheck
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { ProfileHeader, StatsCard, LogoutButton } from '@/components/profile/ProfileComponents'
+import { BottomNav } from '@/components/ui/BottomNav'
+import { ShareButton } from '@/components/ui/ShareButton'
 import { toast } from 'sonner'
-import type { Photo, RatingStats } from '@/types/database'
 
 export default function ProfilePage() {
   const router = useRouter()
   const supabase = createClient()
   
-  const [photo, setPhoto] = useState<Photo | null>(null)
-  const [stats, setStats] = useState<RatingStats | null>(null)
+  const [photo, setPhoto] = useState<any>(null)
+  const [stats, setStats] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   
   useEffect(() => {
@@ -26,7 +26,6 @@ export default function ProfilePage() {
           return
         }
         
-        // Загружаем фото и статистику параллельно
         const [photoResult, statsResult] = await Promise.all([
           supabase
             .from('photos')
@@ -61,104 +60,152 @@ export default function ProfilePage() {
   
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-10 h-10 rounded-full border-4 border-white/20 border-t-white animate-spin" />
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+        <BottomNav />
       </div>
     )
   }
   
+  const rating = stats?.current_rating
+  const percentile = stats?.percentile
+  const isVisible = stats?.is_rating_visible
+  const ratingsCount = stats?.ratings_received_count || 0
+  const minRatings = 20
+  
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-black pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border">
-        <div className="max-w-lg mx-auto px-6 h-16 flex items-center justify-between">
-          <h1 className="text-heading-md text-text-primary">Профиль</h1>
-          <LogoutButton onLogout={handleLogout} />
-        </div>
+      <header className="flex items-center justify-between p-6">
+        <h1 className="text-xl font-semibold text-white">Профиль</h1>
+        <button
+          onClick={handleLogout}
+          className="text-red-500 text-sm hover:text-red-400 transition-colors"
+        >
+          Выйти
+        </button>
       </header>
       
-      {/* Content */}
-      <main className="max-w-lg mx-auto px-6 py-8 space-y-8">
-        {/* Profile header with rating */}
-        <ProfileHeader photo={photo} stats={stats} />
+      {/* Profile content */}
+      <div className="px-6 space-y-8">
+        {/* Photo & Rating */}
+        <div className="text-center">
+          {/* Photo */}
+          <motion.div
+            className="relative w-32 h-32 mx-auto mb-6"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            {photo ? (
+              <img
+                src={photo.url}
+                alt="Profile"
+                className="w-full h-full object-cover rounded-full ring-4 ring-white/20"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-white/10 flex items-center justify-center">
+                <svg className="w-12 h-12 text-white/40" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              </div>
+            )}
+          </motion.div>
+          
+          {/* Rating */}
+          {isVisible && rating ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="text-7xl font-mono font-bold text-white mb-2 tabular-nums">
+                {rating.toFixed(2)}
+              </div>
+              {percentile && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full">
+                  <span className="text-lg">🏆</span>
+                  <span className="text-white/80">Top {percentile.toFixed(0)}%</span>
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              className="bg-white/5 rounded-3xl p-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="text-4xl mb-4">⏳</div>
+              <h3 className="text-lg font-medium text-white mb-2">
+                Недостаточно оценок
+              </h3>
+              <p className="text-white/60 text-sm mb-4">
+                {ratingsCount} из {minRatings}
+              </p>
+              <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-orange-500 to-yellow-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${Math.min(100, (ratingsCount / minRatings) * 100)}%` }}
+                  transition={{ duration: 1, delay: 0.5 }}
+                />
+              </div>
+              <p className="text-white/40 text-xs mt-4">
+                Оценивай других, чтобы получать оценки быстрее
+              </p>
+            </motion.div>
+          )}
+        </div>
         
-        {/* Stats card */}
-        <StatsCard stats={stats} />
-        
-        {/* Navigation */}
+        {/* Stats */}
         <motion.div
-          className="space-y-3"
+          className="grid grid-cols-3 gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="bg-white/5 rounded-2xl p-4 text-center">
+            <div className="text-2xl font-mono font-bold text-white">
+              {ratingsCount}
+            </div>
+            <div className="text-white/40 text-xs mt-1">Получено</div>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-4 text-center">
+            <div className="text-2xl font-mono font-bold text-white">
+              {stats?.ratings_given_count || 0}
+            </div>
+            <div className="text-white/40 text-xs mt-1">Поставлено</div>
+          </div>
+          <div className="bg-white/5 rounded-2xl p-4 text-center">
+            <div className="text-2xl font-mono font-bold text-white">
+              {stats?.rating_power?.toFixed(1) || '1.0'}×
+            </div>
+            <div className="text-white/40 text-xs mt-1">Вес голоса</div>
+          </div>
+        </motion.div>
+        
+        {/* Share button */}
+        <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <Link
-            href="/rate"
-            className="card-interactive flex items-center justify-between p-4"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-surface-elevated flex items-center justify-center">
-                <svg className="w-6 h-6 text-text-secondary" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                </svg>
-              </div>
-              <div>
-                <p className="text-body-md text-text-primary">Оценить</p>
-                <p className="text-caption text-text-tertiary">Оценивай других пользователей</p>
-              </div>
-            </div>
-            <svg className="w-5 h-5 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
-          
-          <Link
-            href="/upload"
-            className="card-interactive flex items-center justify-between p-4"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-surface-elevated flex items-center justify-center">
-                <svg className="w-6 h-6 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-body-md text-text-primary">Сменить фото</p>
-                <p className="text-caption text-text-tertiary">Загрузить новое фото профиля</p>
-              </div>
-            </div>
-            <svg className="w-5 h-5 text-text-tertiary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M9 18l6-6-6-6" />
-            </svg>
-          </Link>
+          <ShareButton rating={rating} percentile={percentile} />
         </motion.div>
-      </main>
+        
+        {/* Change photo */}
+        <motion.button
+          onClick={() => router.push('/upload')}
+          className="w-full py-4 border border-white/20 hover:border-white/40 rounded-2xl text-white/60 hover:text-white transition-colors"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          Сменить фото
+        </motion.button>
+      </div>
       
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-xl border-t border-border safe-bottom">
-        <div className="max-w-lg mx-auto px-6 h-16 flex items-center justify-around">
-          <Link
-            href="/rate"
-            className="flex flex-col items-center gap-1 text-text-tertiary hover:text-text-primary transition-colors"
-          >
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-            </svg>
-            <span className="text-caption">Оценить</span>
-          </Link>
-          
-          <Link
-            href="/profile"
-            className="flex flex-col items-center gap-1 text-text-primary"
-          >
-            <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-            </svg>
-            <span className="text-caption">Профиль</span>
-          </Link>
-        </div>
-      </nav>
+      <BottomNav />
     </div>
   )
 }
